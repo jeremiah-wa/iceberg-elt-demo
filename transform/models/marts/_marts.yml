@@ -1,6 +1,37 @@
 models:
   - name: fct_pull_requests
-    description: One row per pull request, with time to close (null while open)
+    description: >
+      One row per pull request, for analysing how quickly pull requests are closed and
+      merged in each repo. Built from `stg_github__pull_requests`, with `hours_to_close`
+      added. Covers the pull requests among the latest 100 items of each repo, so it shows
+      recent activity rather than full history.
     columns:
       - name: pull_request_id
+        description: Unique id of the pull request across repos, as `owner/name#number`, e.g. `dlt-hub/dlt#2048`
         data_tests: [unique, not_null]
+      - name: repo
+        description: "{{ doc('github_repo') }}"
+      - name: pull_request_number
+        description: "{{ doc('github_number') }}"
+      - name: title
+        description: "{{ doc('github_title') }}"
+      - name: author_login
+        description: "{{ doc('github_author_login') }}"
+      - name: state
+        description: "`OPEN`, `CLOSED` (closed without merging) or `MERGED`"
+      - name: is_merged
+        description: True when the pull request was merged
+      - name: created_at
+        description: "{{ doc('github_created_at') }}"
+      - name: closed_at
+        description: "{{ doc('github_closed_at') }}"
+      - name: hours_to_close
+        description: >
+          Hours from `created_at` to `closed_at`, for merged and unmerged pull requests
+          alike. Null while open. Computed with DuckDB's `date_diff('hour', ...)`, which
+          counts hour boundaries crossed, so it can be one more than the whole hours elapsed:
+          a pull request opened at 10:50 and closed at 11:10 gets 1.
+      - name: comments_total_count
+        description: "{{ doc('github_comments_total_count') }}"
+      - name: reactions_total_count
+        description: "{{ doc('github_reactions_total_count') }}"

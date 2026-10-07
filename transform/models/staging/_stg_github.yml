@@ -1,22 +1,85 @@
 models:
   - name: stg_github__issues
-    description: One row per GitHub issue
+    description: >
+      One row per GitHub issue, pull requests excluded. Cleans `raw.issues`: renames
+      columns, builds a cross-repo `issue_id`, upper-cases `state` and adds an `is_closed`
+      flag. Covers the issues among the latest 100 items of each repo, not full history.
     columns:
       - name: issue_id
+        description: Unique id of the issue across repos, as `owner/name#number`, e.g. `apache/iceberg#1234`
         data_tests: [unique, not_null]
+      - name: repo
+        description: "{{ doc('github_repo') }}"
+      - name: issue_number
+        description: "{{ doc('github_number') }}"
+      - name: title
+        description: "{{ doc('github_title') }}"
       - name: state
+        description: "`OPEN` or `CLOSED`"
         data_tests:
           - accepted_values:
               arguments:
                 values: ['OPEN', 'CLOSED']
+      - name: is_closed
+        description: "{{ doc('github_is_closed') }}"
+      - name: author_login
+        description: "{{ doc('github_author_login') }}"
+      - name: author_association
+        description: "{{ doc('github_author_association') }}"
+      - name: comments_total_count
+        description: "{{ doc('github_comments_total_count') }}"
+      - name: reactions_total_count
+        description: "{{ doc('github_reactions_total_count') }}"
+      - name: created_at
+        description: "{{ doc('github_created_at') }}"
+      - name: updated_at
+        description: "{{ doc('github_updated_at') }}"
+      - name: closed_at
+        description: "{{ doc('github_closed_at') }}"
+      - name: url
+        description: "{{ doc('github_url') }}"
 
   - name: stg_github__pull_requests
-    description: One row per GitHub pull request
+    description: >
+      One row per GitHub pull request. Cleans `raw.pull_requests`: renames columns, builds
+      a cross-repo `pull_request_id`, and derives a `MERGED` state, which GitHub's REST
+      state (`open` or `closed`) doesn't have. Covers the pull requests among the latest
+      100 items of each repo, not full history.
     columns:
       - name: pull_request_id
+        description: Unique id of the pull request across repos, as `owner/name#number`, e.g. `dlt-hub/dlt#2048`
         data_tests: [unique, not_null]
+      - name: repo
+        description: "{{ doc('github_repo') }}"
+      - name: pull_request_number
+        description: "{{ doc('github_number') }}"
+      - name: title
+        description: "{{ doc('github_title') }}"
       - name: state
+        description: "`MERGED` when `merged_at` is set, otherwise GitHub's state upper-cased: `OPEN` or `CLOSED` (closed without merging)"
         data_tests:
           - accepted_values:
               arguments:
                 values: ['OPEN', 'CLOSED', 'MERGED']
+      - name: is_merged
+        description: True when the pull request was merged, i.e. `merged_at` is set
+      - name: is_closed
+        description: "{{ doc('github_is_closed') }}"
+      - name: author_login
+        description: "{{ doc('github_author_login') }}"
+      - name: author_association
+        description: "{{ doc('github_author_association') }}"
+      - name: comments_total_count
+        description: "{{ doc('github_comments_total_count') }}"
+      - name: reactions_total_count
+        description: "{{ doc('github_reactions_total_count') }}"
+      - name: created_at
+        description: "{{ doc('github_created_at') }}"
+      - name: updated_at
+        description: "{{ doc('github_updated_at') }}"
+      - name: closed_at
+        description: "{{ doc('github_closed_at') }}"
+      - name: merged_at
+        description: "{{ doc('github_merged_at') }}"
+      - name: url
+        description: "{{ doc('github_url') }}"

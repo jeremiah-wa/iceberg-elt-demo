@@ -1,8 +1,85 @@
 sources:
   - name: github
-    description: GitHub issues and pull requests loaded by extract_load/github_pipeline.py
+    description: >
+      Issues and pull requests of five open-source repos, loaded from the GitHub REST
+      endpoint `/repos/{owner}/{repo}/issues` by extract_load/github_pipeline.py (dlt).
+      Each load takes the latest 100 items per repo, issues and pull requests together,
+      and replaces both tables. dlt flattens nested objects into columns joined by `__`
+      (e.g. `user.login` becomes `user__login`) and moves nested lists, such as labels and
+      assignees, to child tables like `raw.issues__labels`. Only the columns the staging
+      models use are documented here.
+    loader: dlt
     database: lake
     schema: raw
     tables:
       - name: issues
+        description: >
+          Issues as the GitHub API returns them, one row per issue. The endpoint returns
+          issues and pull requests together; the pipeline keeps records without a
+          `pull_request` field here.
+        columns:
+          - name: repo
+            description: "{{ doc('github_repo') }}"
+          - name: number
+            description: "{{ doc('github_number') }}"
+          - name: title
+            description: "{{ doc('github_title') }}"
+          - name: state
+            description: GitHub's state, `open` or `closed`
+          - name: user__login
+            description: "{{ doc('github_author_login') }}"
+          - name: author_association
+            description: "{{ doc('github_author_association') }}"
+          - name: comments
+            description: "{{ doc('github_comments_total_count') }}"
+          - name: reactions__total_count
+            description: "{{ doc('github_reactions_total_count') }}"
+          - name: created_at
+            description: "{{ doc('github_created_at') }}"
+          - name: updated_at
+            description: "{{ doc('github_updated_at') }}"
+          - name: closed_at
+            description: "{{ doc('github_closed_at') }}"
+          - name: html_url
+            description: "{{ doc('github_url') }}"
+          - name: _dlt_load_id
+            description: Id of the dlt load that wrote the row
+          - name: _dlt_id
+            description: Unique row id dlt assigns, used to link child tables to their parent row
+
       - name: pull_requests
+        description: >
+          Pull requests from the same endpoint, one row per pull request: the records
+          that have a `pull_request` field. The issues endpoint doesn't return review or
+          diff details, but `pull_request__merged_at` tells merged pull requests apart.
+        columns:
+          - name: repo
+            description: "{{ doc('github_repo') }}"
+          - name: number
+            description: "{{ doc('github_number') }}"
+          - name: title
+            description: "{{ doc('github_title') }}"
+          - name: state
+            description: GitHub's state, `open` or `closed`. Merged pull requests are `closed`
+          - name: user__login
+            description: "{{ doc('github_author_login') }}"
+          - name: author_association
+            description: "{{ doc('github_author_association') }}"
+          - name: comments
+            description: "{{ doc('github_comments_total_count') }}"
+          - name: reactions__total_count
+            description: "{{ doc('github_reactions_total_count') }}"
+          - name: created_at
+            description: "{{ doc('github_created_at') }}"
+          - name: updated_at
+            description: "{{ doc('github_updated_at') }}"
+          - name: closed_at
+            description: "{{ doc('github_closed_at') }}"
+          - name: pull_request__merged_at
+            description: "{{ doc('github_merged_at') }}"
+          - name: html_url
+            description: "{{ doc('github_url') }}"
+          - name: _dlt_load_id
+            description: Id of the dlt load that wrote the row
+          - name: _dlt_id
+            description: Unique row id dlt assigns, used to link child tables to their parent row

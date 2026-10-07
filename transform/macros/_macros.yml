@@ -1,0 +1,22 @@
+macros:
+  - name: generate_schema_name
+    description: >
+      Overrides dbt's built-in macro so a model's custom schema is used as-is: models in
+      `staging/` land in the `staging` schema and models in `marts/` in `marts`, instead of
+      dbt's default `<target_schema>_staging`. Models without a custom schema use the
+      target's schema.
+    arguments:
+      - name: custom_schema_name
+        type: string
+        description: The model's `schema` config, or none if it has no custom schema
+      - name: node
+        description: The model being built (unused)
+
+  - name: materialization_iceberg_table_duckdb
+    description: >
+      The `iceberg_table` materialization every model uses (set in dbt_project.yml).
+      dbt-duckdb's `table` materialization builds `<model>__dbt_tmp` and renames it into
+      place, but DuckDB can't rename an Iceberg table created in the same transaction, run
+      `CREATE OR REPLACE` on it, or drop and recreate it in one transaction. This
+      materialization drops the existing table, commits, then creates the table from the
+      model's SQL. While a model rebuilds, its table is briefly missing.
