@@ -38,7 +38,10 @@ DuckDB needs no S3 keys here. Lakekeeper hands out short-lived credentials for e
 
 - [profiles.yml](profiles.yml) loads DuckDB's `iceberg` extension and attaches the Lakekeeper warehouse `demo` as a database called `lake`. `data/transform.duckdb` is DuckDB's local session file. It holds no tables.
 - [dbt_project.yml](dbt_project.yml) puts every model in the `lake` database, in the `staging` or `marts` schema. The [generate_schema_name](macros/generate_schema_name.sql) macro keeps those names as they are, instead of dbt's default `<target_schema>_staging`.
-- Models use a custom `iceberg_table` materialization ([macros/iceberg_table.sql](macros/iceberg_table.sql)). dbt-duckdb's built-in `table` materialization builds a temporary table and renames it into place. DuckDB can't rename Iceberg tables created in the same transaction, and it doesn't support `CREATE OR REPLACE` on them. So `iceberg_table` drops the table, commits, and creates it again. While a model rebuilds, its table is missing for a moment.
+- Models use a custom `iceberg_table` materialization ([macros/iceberg_table.sql](macros/iceberg_table.sql)). dbt-duckdb's built-in `table` materialization builds a temporary table and renames it into place. DuckDB can't rename Iceberg tables created in the same transaction, and it doesn't support `CREATE OR REPLACE` on them. So `iceberg_table` drops the table, commits, and creates it again.
+
+> [!NOTE]
+> Rebuilds aren't atomic. While a model rebuilds, its table doesn't exist, and queries against it fail. If the build fails, the old table is already gone and stays gone until a later run succeeds. Each rebuild also starts the table's Iceberg snapshot history over. `iceberg_table` ignores `grants`, `persist_docs`, `indexes`, `partitioned_by` and `sorted_by`, and doesn't run Python models. [docs/iceberg-materialization.md](docs/iceberg-materialization.md) has the tested details and what would let us go back to the built-in `table` materialization.
 
 ## Why dbt-core and not dbt v2
 
