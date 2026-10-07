@@ -1,0 +1,22 @@
+models:
+  - name: stg_github__issues
+    description: One row per GitHub issue
+    columns:
+      - name: issue_id
+        data_tests: [unique, not_null]
+      - name: state
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['OPEN', 'CLOSED']
+
+  - name: stg_github__pull_requests
+    description: One row per GitHub pull request
+    columns:
+      - name: pull_request_id
+        data_tests: [unique, not_null]
+      - name: state
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ['OPEN', 'CLOSED', 'MERGED']

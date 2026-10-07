@@ -1,0 +1,8 @@
+sources:
+  - name: github
+    description: GitHub issues and pull requests loaded by extract_load/github_pipeline.py
+    database: lake
+    schema: raw
+    tables:
+      - name: issues
+      - name: pull_requests
