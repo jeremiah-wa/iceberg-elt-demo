@@ -1,0 +1,6 @@
+models:
+  - name: fct_pull_requests
+    description: One row per pull request, with time to close (null while open)
+    columns:
+      - name: pull_request_id
+        data_tests: [unique, not_null]
