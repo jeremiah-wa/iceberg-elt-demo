@@ -1,0 +1,5 @@
+load_from:
+  - python_module:
+      module_name: definitions
+      working_directory: /app/orchestrate
+      location_name: elt

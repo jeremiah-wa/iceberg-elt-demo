@@ -1,0 +1,15 @@
+.git
+.venv
+docs
+infra/*
+!infra/dagster
+**/__pycache__
+**/.env
+**/.dagster_home
+**/.tmp_dagster_home_*
+extract_load/.dlt/secrets.toml
+transform/target
+transform/target-docker
+transform/logs
+transform/data/*.duckdb
+transform/.user.yml
