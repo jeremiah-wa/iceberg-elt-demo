@@ -1,0 +1,9 @@
+# dlt: secrets, pinned profile, local state and data
+.dlt/secrets.toml
+.dlt/*.secrets.toml
+.dlt/profile-name
+.dlt/state
+.dlt/data
+*.duckdb
+*.wal
+__pycache__/
