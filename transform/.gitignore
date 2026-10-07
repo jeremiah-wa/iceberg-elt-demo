@@ -3,6 +3,5 @@ target-docker/
 logs/
 *.duckdb
 *.duckdb.wal
-.env
 dbt_internal_packages/
 .user.yml

@@ -6,4 +6,3 @@
 .dlt/data
 *.duckdb
 *.wal
-__pycache__/
