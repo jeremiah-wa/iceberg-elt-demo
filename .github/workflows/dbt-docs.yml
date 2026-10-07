@@ -1,0 +1,48 @@
+# Builds the dbt docs site and publishes it to GitHub Pages
+name: dbt docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "transform/**"
+      - "uv.lock"
+      - ".github/workflows/dbt-docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: true
+      - run: uv sync --frozen --package transform
+      # `--static` writes a single static_index.html with the manifest and catalog inlined
+      - name: Generate docs
+        working-directory: transform
+        run: uv run --no-sync dbt docs generate --static --target docs
+      - run: mkdir site && cp transform/target/static_index.html site/index.html
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

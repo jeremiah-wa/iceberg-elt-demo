@@ -44,6 +44,10 @@ DuckDB needs no S3 keys here. Lakekeeper hands out short-lived credentials for e
 
 dbt v2 ships with its own DuckDB adapter and `catalogs.yml` support for Iceberg REST catalogs. dagster-dbt doesn't support it yet ([dagster#34233](https://github.com/dagster-io/dagster/issues/34233)), and installing both breaks, because dagster-dbt depends on dbt-core 1.x and both packages provide the `dbt` command. dbt-core 1.12 is the newest version dagster-dbt accepts.
 
+## Docs site
+
+[.github/workflows/dbt-docs.yml](../.github/workflows/dbt-docs.yml) runs `dbt docs generate` on every push to `main` that touches `transform/` and publishes the result to GitHub Pages. CI has no Lakekeeper, so it uses the `docs` target in [profiles.yml](profiles.yml), which attaches an empty in-memory database as `lake`. Models still compile and the lineage graph is complete, but the catalog is empty: columns show the descriptions from the YAML files, without data types.
+
 ## dbt artifacts
 
 The Dagster container sets `DBT_TARGET_PATH=target-docker`, so its artifacts go to `target-docker/` instead of `target/`. dbt's partial-parse file stores file paths, and one written on Windows breaks a parse in the Linux container. If you also run dbt on your machine, for example through an editor extension, the two don't collide. Git ignores both folders.

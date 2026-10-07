@@ -14,3 +14,11 @@ transform:
             type: iceberg
             endpoint: http://lakekeeper:8181/catalog
             authorization_type: none
+    # For `dbt docs generate` in CI (.github/workflows/dbt-docs.yml), where Lakekeeper isn't
+    # running: an empty in-memory `lake` lets models compile, but the catalog has no columns
+    docs:
+      type: duckdb
+      path: ":memory:"
+      attach:
+        - path: ":memory:"
+          alias: lake
