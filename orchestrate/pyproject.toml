@@ -1,0 +1,24 @@
+[project]
+name = "orchestrate"
+version = "0.1.0"
+description = "Dagster definitions orchestrating extract_load and transform"
+requires-python = ">=3.13"
+dependencies = [
+    "dagster>=1.13.25",
+    "dagster-dbt>=0.29.25",
+    "dagster-dlt>=0.29.25",
+    "dagster-webserver>=1.13.25",
+    "extract-load",
+    "transform",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+extract-load = { workspace = true }
+transform = { workspace = true }
+
+[tool.dagster]
+module_name = "definitions"
+code_location_name = "elt"
