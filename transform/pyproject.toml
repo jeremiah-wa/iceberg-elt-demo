@@ -1,0 +1,13 @@
+[project]
+name = "transform"
+version = "0.1.0"
+description = "dbt project: Iceberg raw -> staging -> marts"
+requires-python = ">=3.13"
+dependencies = [
+    # dagster-dbt supports dbt-core <1.13 (no dbt v2 support yet)
+    "dbt-core>=1.12,<1.13",
+    "dbt-duckdb>=1.11.0",
+]
+
+[tool.uv]
+package = false

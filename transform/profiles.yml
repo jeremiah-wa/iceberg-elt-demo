@@ -1,0 +1,16 @@
+transform:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: data/transform.duckdb
+      extensions: [httpfs, iceberg]
+      attach:
+        # Lakekeeper (infra/docker-compose.yml, reached by service name from the dagster
+        # container) vends short-lived S3 credentials per table, so no S3 secret is needed
+        - path: demo
+          alias: lake
+          options:
+            type: iceberg
+            endpoint: http://lakekeeper:8181/catalog
+            authorization_type: none
