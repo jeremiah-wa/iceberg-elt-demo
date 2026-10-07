@@ -1,0 +1,151 @@
+# Local Iceberg lakehouse: MinIO (S3-compatible storage), Lakekeeper (Iceberg REST catalog)
+# and Dagster, which runs the dlt -> dbt pipeline.
+#
+#   Dagster    -> http://localhost:3000   UI: "Materialize all" runs the pipeline
+#   MinIO      -> http://localhost:9001   console (API on :9000)
+#   Lakekeeper -> http://localhost:8181   UI + Iceberg REST catalog (warehouse "demo")
+#
+# Containers reach each other by service name (minio:9000, lakekeeper:8181). dlt and dbt run
+# inside the dagster container, so only containers read or write table data.
+#
+# Every setting has a default, so `docker compose up -d` works as is; .env overrides them.
+
+name: iceberg-elt-demo
+
+x-minio-credentials: &minio-credentials
+  # also in lakekeeper/create-warehouse.json: change both together
+  MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio-root-user}
+  MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio-root-password}
+
+x-lakekeeper-env: &lakekeeper-env
+  LAKEKEEPER__PG_ENCRYPTION_KEY: ${LAKEKEEPER_ENCRYPTION_KEY:-This-is-NOT-Secure!}
+  LAKEKEEPER__PG_DATABASE_URL_READ: postgresql://postgres:postgres@lakekeeper-db:5432/postgres
+  LAKEKEEPER__PG_DATABASE_URL_WRITE: postgresql://postgres:postgres@lakekeeper-db:5432/postgres
+
+services:
+  # --- Object storage --------------------------------------------------------
+  # MinIO no longer publishes images; silo is a maintained MinIO fork (same API, same mc).
+  minio:
+    image: pgsty/silo:RELEASE.2026-09-03T13-18-01Z
+    command: server /data --console-address ":9001"
+    environment:
+      <<: *minio-credentials
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 2s
+      timeout: 10s
+      retries: 10
+      start_period: 5s
+
+  create-bucket:
+    image: pgsty/silo:RELEASE.2026-09-03T13-18-01Z
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}" &&
+        mc mb --ignore-existing local/lake
+    environment:
+      <<: *minio-credentials
+    restart: "no"
+
+  # --- Iceberg REST catalog: Lakekeeper ---------------------------------------
+  lakekeeper-db:
+    image: postgres:17
+    environment:
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - lakekeeper-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -p 5432 -d postgres"]
+      interval: 2s
+      timeout: 10s
+      retries: 10
+      start_period: 10s
+
+  lakekeeper-migrate:
+    image: quay.io/lakekeeper/catalog:${LAKEKEEPER_VERSION:-v0.13.6}
+    environment:
+      <<: *lakekeeper-env
+    command: ["migrate"]
+    depends_on:
+      lakekeeper-db:
+        condition: service_healthy
+    restart: "no"
+
+  lakekeeper:
+    image: quay.io/lakekeeper/catalog:${LAKEKEEPER_VERSION:-v0.13.6}
+    environment:
+      <<: *lakekeeper-env
+    command: ["serve"]
+    ports:
+      - "8181:8181"
+    depends_on:
+      lakekeeper-migrate:
+        condition: service_completed_successfully
+      create-bucket:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/home/nonroot/lakekeeper", "healthcheck"]
+      interval: 2s
+      timeout: 10s
+      retries: 10
+      start_period: 3s
+
+  # One-shot: bootstrap the server and create the "demo" warehouse on s3://lake/lakekeeper
+  # (storage endpoint http://minio:9000). A 4xx on re-run means it already exists, which is fine.
+  lakekeeper-init:
+    image: curlimages/curl:8.16.0
+    depends_on:
+      lakekeeper:
+        condition: service_healthy
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        curl -s -o /dev/null -w "bootstrap: %{http_code}\n" -X POST http://lakekeeper:8181/management/v1/bootstrap \
+          -H 'Content-Type: application/json' -d '{"accept-terms-of-use": true}'
+        curl -s -w "\nwarehouse: %{http_code}\n" -X POST http://lakekeeper:8181/management/v1/warehouse \
+          -H 'Content-Type: application/json' -d @/init/create-warehouse.json
+        exit 0
+    volumes:
+      - ./lakekeeper/create-warehouse.json:/init/create-warehouse.json:ro
+    restart: "no"
+
+  # --- Orchestration ----------------------------------------------------------
+  # dagster dev with the workspace's locked environment. Project sources are bind-mounted,
+  # so code edits show up after "Reload definitions" in the UI.
+  dagster:
+    build:
+      context: ..
+      dockerfile: infra/dagster/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      # MinIO keys for dlt's filesystem destination (state and schema files next to the tables)
+      DESTINATION__FILESYSTEM__CREDENTIALS__AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio-root-user}
+      DESTINATION__FILESYSTEM__CREDENTIALS__AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minio-root-password}
+      # dbt artifacts aren't portable between a Windows/macOS host and Linux, so the container
+      # keeps its own target dir in case dbt also runs on the host (e.g. an IDE extension)
+      DBT_TARGET_PATH: target-docker
+    volumes:
+      - ../extract_load:/app/extract_load
+      - ../transform:/app/transform
+      - ../orchestrate:/app/orchestrate
+      - dagster-home:/opt/dagster/home
+    depends_on:
+      lakekeeper-init:
+        condition: service_completed_successfully
+
+volumes:
+  dagster-home:
+  minio-data:
+  lakekeeper-db-data:
