@@ -4,12 +4,12 @@ log_level="WARNING"  # the system log level of dlt
 dlthub_telemetry = true
 
 # Runs inside the dagster container (infra/docker-compose.yml), which reaches MinIO and
-# Lakekeeper by service name and passes the MinIO keys as environment variables.
+# Lakekeeper on localhost and passes the MinIO keys as environment variables.
 [destination.filesystem]
 bucket_url = "s3://lake/lakekeeper"  # must sit inside the Lakekeeper warehouse location
 
 [destination.filesystem.credentials]
-endpoint_url = "http://minio:9000"
+endpoint_url = "http://localhost:9000"
 region_name = "us-east-1"
 
 # Lakekeeper REST catalog. It vends short-lived S3 credentials (STS) per table, so no keys here.
@@ -18,5 +18,5 @@ iceberg_catalog_type = "rest"
 
 [iceberg_catalog.iceberg_catalog_config]
 type = "rest"
-uri = "http://lakekeeper:8181/catalog"
+uri = "http://localhost:8181/catalog"
 warehouse = "demo"

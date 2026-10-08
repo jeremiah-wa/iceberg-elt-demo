@@ -6,9 +6,11 @@
 #   Lakekeeper -> http://localhost:8181   UI + Iceberg REST catalog (warehouse "demo")
 #   Trino      -> http://localhost:8080   UI: queries dbt sent
 #
-# Containers reach each other by service name (minio:9000, lakekeeper:8181, trino:8080). dlt
-# and dbt run inside the dagster container, and dbt's SQL runs in Trino, so only containers
-# read or write table data.
+# Every service except lakekeeper-db shares the network namespace of the `net` service, like
+# containers in a Kubernetes pod. So localhost:<port> reaches the same service from your
+# machine, your browser and every container, and Lakekeeper can hand out http://localhost:9000
+# as the storage endpoint. The Lakekeeper UI's table preview reads files from the browser at
+# that address.
 #
 # Every setting has a default, so `docker compose up -d` works as is; .env overrides them.
 
@@ -25,6 +27,19 @@ x-lakekeeper-env: &lakekeeper-env
   LAKEKEEPER__PG_DATABASE_URL_WRITE: postgresql://postgres:postgres@lakekeeper-db:5432/postgres
 
 services:
+  # --- Shared network ---------------------------------------------------------
+  # Holds the network namespace the other services join with `network_mode: service:net`, so
+  # it publishes all their ports. Services in it can't share a port. pause does nothing but
+  # wait (about 300 KB of memory). If net is recreated, `docker compose up -d` recreates the
+  # services in it too.
+  net:
+    image: registry.k8s.io/pause:3.10.1
+    ports:
+      - "3000:3000"   # Dagster
+      - "8181:8181"   # Lakekeeper
+      - "9000:9000"   # MinIO API
+      - "9001:9001"   # MinIO console
+
   # --- Object storage --------------------------------------------------------
   # MinIO no longer publishes images; silo is a maintained MinIO fork (same API, same mc).
   minio:
@@ -32,9 +47,7 @@ services:
     command: server /data --console-address ":9001"
     environment:
       <<: *minio-credentials
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+    network_mode: service:net
     volumes:
       - minio-data:/data
     healthcheck:
@@ -46,6 +59,7 @@ services:
 
   create-bucket:
     image: pgsty/silo:RELEASE.2026-09-03T13-18-01Z
+    network_mode: service:net
     depends_on:
       minio:
         condition: service_healthy
@@ -53,7 +67,7 @@ services:
     command:
       - -c
       - |
-        mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}" &&
+        mc alias set local http://localhost:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}" &&
         mc mb --ignore-existing local/lake
     environment:
       <<: *minio-credentials
@@ -87,9 +101,10 @@ services:
     image: quay.io/lakekeeper/catalog:${LAKEKEEPER_VERSION:-v0.13.6}
     environment:
       <<: *lakekeeper-env
+      # Prometheus metrics default to port 9000, which MinIO uses in the shared network
+      LAKEKEEPER__METRICS_PORT: 9100
     command: ["serve"]
-    ports:
-      - "8181:8181"
+    network_mode: service:net
     depends_on:
       lakekeeper-migrate:
         condition: service_completed_successfully
@@ -103,9 +118,10 @@ services:
       start_period: 3s
 
   # One-shot: bootstrap the server and create the "demo" warehouse on s3://lake/lakekeeper
-  # (storage endpoint http://minio:9000). A 4xx on re-run means it already exists, which is fine.
+  # (storage endpoint http://localhost:9000). A 4xx on re-run means it already exists, which is fine.
   lakekeeper-init:
     image: curlimages/curl:8.16.0
+    network_mode: service:net
     depends_on:
       lakekeeper:
         condition: service_healthy
@@ -113,9 +129,9 @@ services:
     command:
       - -c
       - |
-        curl -s -o /dev/null -w "bootstrap: %{http_code}\n" -X POST http://lakekeeper:8181/management/v1/bootstrap \
+        curl -s -o /dev/null -w "bootstrap: %{http_code}\n" -X POST http://localhost:8181/management/v1/bootstrap \
           -H 'Content-Type: application/json' -d '{"accept-terms-of-use": true}'
-        curl -s -w "\nwarehouse: %{http_code}\n" -X POST http://lakekeeper:8181/management/v1/warehouse \
+        curl -s -w "\nwarehouse: %{http_code}\n" -X POST http://localhost:8181/management/v1/warehouse \
           -H 'Content-Type: application/json' -d @/init/create-warehouse.json
         exit 0
     volumes:
@@ -151,8 +167,7 @@ services:
     build:
       context: ..
       dockerfile: infra/dagster/Dockerfile
-    ports:
-      - "3000:3000"
+    network_mode: service:net
     environment:
       # MinIO keys for dlt's filesystem destination (state and schema files next to the tables)
       DESTINATION__FILESYSTEM__CREDENTIALS__AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minio-root-user}
