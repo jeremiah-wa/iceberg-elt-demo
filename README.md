@@ -6,7 +6,9 @@ Everything runs in Docker. You don't need a GitHub token, cloud account or local
 
 ## Why this demo exists
 
-The project set out to answer one question: can Iceberg get you out of vendor lock-in? Partly. When the dbt models moved from DuckDB to Trino, the tables and their snapshot history came along without an export or a migration. The SQL, the way each engine writes tables, and table maintenance didn't come along. Each had to be redone for Trino. The [Iceberg Roulette](https://b-per.github.io/iceberg-roulette/#matrix) compatibility matrix shows the same pattern for cloud engines: most can read Iceberg from many catalogs, but the catalog decides which engines can write. [docs/vendor-lock-in.md](docs/vendor-lock-in.md) has the full answer.
+The project set out to answer one question: **Can Iceberg get you out of vendor lock-in?**
+
+**The short version:** Partly. When the dbt models moved from DuckDB to Trino, the tables and their snapshot history came along without an export or a migration. The SQL, the way each engine writes tables, and table maintenance didn't come along. Each had to be redone for Trino. The [Iceberg Roulette](https://b-per.github.io/iceberg-roulette/#matrix) compatibility matrix shows the same pattern for cloud engines: most can read Iceberg from many catalogs, but the catalog decides which engines can write. [docs/vendor-lock-in.md](docs/vendor-lock-in.md) has the full answer.
 
 <p align="center">
   <img src="static/dagster.svg" width="700" alt="Dagster asset graph: the dlt assets issues and pull_requests in the ingest group feed the dbt models stg_github__issues, stg_github__pull_requests and fct_pull_requests in the transform group, all materialized with their asset checks passed">
@@ -29,7 +31,7 @@ Dagster runs the dlt and dbt steps as one job.
 
 ## Quickstart
 
-You need Docker with Compose v2, about 6 GB of memory and 6 GB of disk for Docker, and ports 3000, 8080, 8181, 9000 and 9001 free. [infra/README.md](infra/README.md#prerequisites) lists the prerequisites and the measured requirements.
+You need Docker with Compose v2. [infra/README.md](infra/README.md#prerequisites) lists the prerequisites and the measured requirements.
 
 ```bash
 git clone <repo-url> iceberg-elt-demo
