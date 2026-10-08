@@ -49,12 +49,3 @@ macros:
       - name: to_relation
         type: relation
         description: The relation with the new name. Only its identifier is used
-
-  - name: materialization_iceberg_table_duckdb
-    description: >
-      The `iceberg_table` materialization every model uses (set in dbt_project.yml).
-      dbt-duckdb's `table` materialization builds `<model>__dbt_tmp` and renames it into
-      place, but DuckDB can't rename an Iceberg table created in the same transaction, run
-      `CREATE OR REPLACE` on it, or drop and recreate it in one transaction. This
-      materialization drops the existing table, commits, then creates the table from the
-      model's SQL. While a model rebuilds, its table is briefly missing.

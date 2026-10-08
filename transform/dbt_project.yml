@@ -9,9 +9,10 @@ clean-targets:
 
 models:
   transform:
-    # Every model is an Iceberg table in the REST catalog attached as `lake` (see profiles.yml)
+    # Every model is an Iceberg table in the REST catalog attached as `lake` (see profiles.yml).
+    # The built-in `table` materialization needs the overrides in macros/iceberg_relations.sql
     +database: lake
-    +materialized: iceberg_table
+    +materialized: table
     staging:
       +schema: staging
     marts:
