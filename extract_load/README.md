@@ -27,8 +27,8 @@ docker compose exec -w /app/extract_load dagster python github_pipeline.py --ite
 
 `pipeline.run(..., table_format="iceberg")` makes dlt write Iceberg tables through pyiceberg. [.dlt/config.toml](.dlt/config.toml) points dlt at:
 
-- MinIO (`s3://lake/lakekeeper`, endpoint `http://minio:9000`), where dlt also keeps its own state and schema files. The Dagster container passes the MinIO keys as environment variables.
-- The Lakekeeper REST catalog (`http://lakekeeper:8181/catalog`, warehouse `demo`). When dlt opens a table, Lakekeeper returns short-lived S3 credentials scoped to that table, and pyiceberg writes the data files with them.
+- MinIO (`s3://lake/lakekeeper`, endpoint `http://localhost:9000`), where dlt also keeps its own state and schema files. The Dagster container passes the MinIO keys as environment variables.
+- The Lakekeeper REST catalog (`http://localhost:8181/catalog`, warehouse `demo`). When dlt opens a table, Lakekeeper returns short-lived S3 credentials scoped to that table, and pyiceberg writes the data files with them.
 
 ## GitHub rate limits
 

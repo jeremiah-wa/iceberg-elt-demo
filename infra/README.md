@@ -26,6 +26,7 @@ On Docker Desktop, the memory available to Docker is set under **Settings > Reso
 
 | Service | Image | Port | Role |
 |---|---|---|---|
+| `net` | `registry.k8s.io/pause` | all of the ports below | Holds the network the other services share and publishes their ports. See [Networking](#networking). |
 | `minio` | `pgsty/silo` | 9000 (API), 9001 (console) | S3-compatible storage. Tables live in the `lake` bucket. |
 | `lakekeeper` | `quay.io/lakekeeper/catalog` | 8181 | Iceberg REST catalog and UI. Its warehouse `demo` stores tables under `s3://lake/lakekeeper`. |
 | `lakekeeper-db` | `postgres:17` | none | Lakekeeper's metadata database |
@@ -35,9 +36,17 @@ On Docker Desktop, the memory available to Docker is set under **Settings > Reso
 
 MinIO no longer publishes Docker images, so the stack uses `pgsty/silo`, a maintained fork with the same API and `mc` client.
 
-## Why the pipelines run in containers
+## Networking
 
-When a client opens a table, Lakekeeper returns short-lived S3 credentials and the storage endpoint to use with them. That endpoint is `http://minio:9000`, the address Lakekeeper itself uses, and the name `minio` only resolves inside the Compose network. So dlt and dbt run in the `dagster` container, Trino runs dbt's SQL in its own container, and your machine only opens the web UIs.
+When a client opens a table, Lakekeeper returns short-lived S3 credentials and the storage endpoint to use with them. Every client gets the same endpoint, whether it runs in a container or is your browser, when the Lakekeeper UI previews a table. So the endpoint has to work from all of them.
+
+All services except `lakekeeper-db` share one network namespace, the way containers in a Kubernetes pod do. The `net` service owns it and publishes the ports, and the other services join it with `network_mode: service:net`. Inside every container, `localhost` reaches the same services as on your machine, so the warehouse endpoint is `http://localhost:9000` and every address in the project uses `localhost`. Lakekeeper still reaches its database as `lakekeeper-db:5432`.
+
+What comes with it:
+
+- Two services in the namespace can't listen on the same port. Lakekeeper serves metrics on 9000 by default, so `LAKEKEEPER__METRICS_PORT` moves them to 9100.
+- Ports are published on `net`, not on the services that use them.
+- If `net` is recreated, the services in it lose their network. `docker compose up -d` recreates them too.
 
 ## Trino
 
