@@ -49,7 +49,7 @@ flowchart LR
 | Postgres (`lakekeeper-db`) | Lakekeeper's own database: namespaces, tables, and the pointer to each table's current metadata file | `infra/docker-compose.yml` |
 | MinIO | S3-compatible storage. Every data and metadata file lives in the `lake` bucket. | `infra/docker-compose.yml` |
 
-Trino has to run on the Docker Compose network. It reaches storage at `http://minio:9000`, the address Lakekeeper also hands out, and the name `minio` only resolves inside that network. dbt runs in the `dagster` container and reaches Trino as `trino:8080`.
+The services share one network, so each reaches the others on `localhost`, the same addresses your machine uses ([infra/README.md](../../infra/README.md#networking) explains how). Trino reaches storage at `http://localhost:9000`, the address Lakekeeper also hands out. dbt runs in the `dagster` container and reaches Trino at `localhost:8080`.
 
 ## How Trino gets a `lake` catalog
 
@@ -58,11 +58,11 @@ Trino reads its catalogs from files at startup. [infra/trino/catalog/lake.proper
 ```properties
 connector.name=iceberg
 iceberg.catalog.type=rest
-iceberg.rest-catalog.uri=http://lakekeeper:8181/catalog
+iceberg.rest-catalog.uri=http://localhost:8181/catalog
 iceberg.rest-catalog.warehouse=demo
 iceberg.rest-catalog.vended-credentials-enabled=true
 fs.native-s3.enabled=true
-s3.endpoint=http://minio:9000
+s3.endpoint=http://localhost:9000
 s3.region=local-01
 s3.path-style-access=true
 ```
@@ -71,7 +71,7 @@ s3.path-style-access=true
 |---|---|
 | `connector.name=iceberg` | Use Trino's Iceberg connector |
 | `iceberg.catalog.type=rest` | The tables are registered in an Iceberg REST catalog |
-| `iceberg.rest-catalog.uri` | Lakekeeper's REST address inside the Compose network. Lakekeeper runs without login in this demo, and Trino's default is no authentication. |
+| `iceberg.rest-catalog.uri` | Lakekeeper's REST address. Lakekeeper runs without login in this demo, and Trino's default is no authentication. |
 | `iceberg.rest-catalog.warehouse` | The name of the Lakekeeper warehouse |
 | `iceberg.rest-catalog.vended-credentials-enabled` | Use the temporary S3 keys Lakekeeper returns with each table |
 | `fs.native-s3.enabled` | Read and write files with Trino's S3 file system |
