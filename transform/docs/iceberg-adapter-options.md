@@ -1,5 +1,8 @@
 # Options for atomic Iceberg rebuilds
 
+> [!NOTE]
+> Update, 2026-10-08. [Option 3](#option-3-dbt-trino) was tested against Lakekeeper with `on_table_exists='replace'`, and the models now use it. Rebuilds left no gap, a failed build kept the old table, and every rebuild added a snapshot, as this page expected. [Option 2](#option-2-keep-dbt-duckdb-commit-before-each-rename) was tested too. It cut the gap to under 0.1 s, but `persist_docs` failed and a failure after the backup rename left the table missing. [iceberg-materialization.md](iceberg-materialization.md) has the results. The rest of this page is the research as written before the tests.
+
 [iceberg-materialization.md](iceberg-materialization.md) explains why every model uses the custom `iceberg_table` materialization. DuckDB's Iceberg extension rejects the statements dbt-duckdb's `table` materialization runs, so the macro drops the table, commits and creates it again. While a model rebuilds, its table doesn't exist. A failed build leaves no table, and the table's Iceberg snapshot history restarts on every run.
 
 This page compares other ways to build the tables. The goal is a rebuild that keeps the old table readable until the new one commits and, ideally, keeps snapshot history, against an Iceberg REST catalog like Lakekeeper. It covers fixes that keep dbt-duckdb, other dbt v1 adapters, and dbt v2.
