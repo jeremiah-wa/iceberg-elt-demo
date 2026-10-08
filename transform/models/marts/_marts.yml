@@ -27,10 +27,10 @@ models:
         description: "{{ doc('github_closed_at') }}"
       - name: hours_to_close
         description: >
-          Hours from `created_at` to `closed_at`, for merged and unmerged pull requests
-          alike. Null while open. Computed with DuckDB's `date_diff('hour', ...)`, which
-          counts hour boundaries crossed, so it can be one more than the whole hours elapsed:
-          a pull request opened at 10:50 and closed at 11:10 gets 1.
+          Whole hours from `created_at` to `closed_at`, rounded down, for merged and unmerged
+          pull requests alike. Null while open. Computed with Trino's `date_diff('hour', ...)`,
+          which counts complete hours: a pull request opened at 10:50 and closed at 11:10
+          gets 0.
       - name: comments_total_count
         description: "{{ doc('github_comments_total_count') }}"
       - name: reactions_total_count

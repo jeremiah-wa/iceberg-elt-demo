@@ -7,11 +7,18 @@ macro-paths: ["macros"]
 clean-targets:
   - "target"
 
+flags:
+  # Opts into dbt-trino's future default, which silences a warning on every run. Trino is
+  # reached over plain http (profiles.yml), so there's no certificate to validate
+  require_certificate_validation: true
+
 models:
   transform:
-    # Every model is an Iceberg table in the REST catalog attached as `lake` (see profiles.yml)
+    # Every model is an Iceberg table in Trino's catalog `lake` (see profiles.yml). `replace`
+    # rebuilds a table with CREATE OR REPLACE TABLE, which swaps it in one Iceberg commit
     +database: lake
-    +materialized: iceberg_table
+    +materialized: table
+    +on_table_exists: replace
     staging:
       +schema: staging
     marts:

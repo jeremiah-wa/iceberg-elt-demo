@@ -7,7 +7,7 @@ This is the dbt project of [iceberg-elt-demo](https://github.com/jeremiah-wa/ice
 2. **Transform.** This project cleans them into the `staging` models and builds the `marts` models on top.
 3. **Orchestrate.** Dagster runs both steps as one job, daily at 06:00.
 
-All tables are Iceberg tables: Parquet files in MinIO, registered in the Lakekeeper REST catalog (warehouse `demo`). DuckDB does the compute, through the dbt-duckdb adapter.
+All tables are Iceberg tables: Parquet files in MinIO, registered in the Lakekeeper REST catalog (warehouse `demo`). Trino does the compute, through the dbt-trino adapter.
 
 ## Layers
 

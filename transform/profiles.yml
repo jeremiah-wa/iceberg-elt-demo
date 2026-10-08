@@ -2,23 +2,25 @@ transform:
   target: dev
   outputs:
     dev:
-      type: duckdb
-      path: data/transform.duckdb
-      extensions: [httpfs, iceberg]
-      attach:
-        # Lakekeeper (infra/docker-compose.yml, reached by service name from the dagster
-        # container) vends short-lived S3 credentials per table, so no S3 secret is needed
-        - path: demo
-          alias: lake
-          options:
-            type: iceberg
-            endpoint: http://lakekeeper:8181/catalog
-            authorization_type: none
-    # For `dbt docs generate` in CI (.github/workflows/dbt-docs.yml), where Lakekeeper isn't
-    # running: an empty in-memory `lake` lets models compile, but the catalog has no columns
+      # Trino (infra/docker-compose.yml, reached by service name from the dagster container)
+      # runs the models. Its catalog `lake` is the Lakekeeper warehouse "demo", configured in
+      # infra/trino/catalog/lake.properties
+      type: trino
+      method: none
+      host: trino
+      port: 8080
+      user: dbt
+      database: lake
+      # Models set their own schema (staging, marts). This is only the fallback
+      schema: main
+    # For `dbt docs generate` in CI (.github/workflows/dbt-docs.yml), where Trino isn't
+    # running. The workflow passes --empty-catalog and --no-populate-cache, so dbt never
+    # connects. Models compile, but the catalog has no columns
     docs:
-      type: duckdb
-      path: ":memory:"
-      attach:
-        - path: ":memory:"
-          alias: lake
+      type: trino
+      method: none
+      host: localhost
+      port: 8080
+      user: dbt
+      database: lake
+      schema: main

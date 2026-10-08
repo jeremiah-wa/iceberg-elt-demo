@@ -1,5 +1,5 @@
 select
-    repo || '#' || number as issue_id,
+    repo || '#' || cast(number as varchar) as issue_id,
     repo,
     number as issue_number,
     title,

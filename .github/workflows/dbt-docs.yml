@@ -28,10 +28,12 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --frozen --package transform
-      # `--static` writes a single static_index.html with the manifest and catalog inlined
+      # `--static` writes a single static_index.html with the manifest and catalog inlined.
+      # CI has no Trino, so dbt mustn't connect: --no-populate-cache skips listing the
+      # warehouse's tables, and --empty-catalog skips reading their columns
       - name: Generate docs
         working-directory: transform
-        run: uv run --no-sync dbt docs generate --static --target docs
+        run: uv run --no-sync dbt docs generate --static --target docs --empty-catalog --no-populate-cache
       - run: mkdir site && cp transform/target/static_index.html site/index.html
       - uses: actions/upload-pages-artifact@v5
         with:

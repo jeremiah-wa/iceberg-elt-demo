@@ -6,7 +6,7 @@ requires-python = ">=3.13"
 dependencies = [
     # dagster-dbt supports dbt-core <1.13 (no dbt v2 support yet)
     "dbt-core>=1.12,<1.13",
-    "dbt-duckdb>=1.11.0",
+    "dbt-trino>=1.10.6",
 ]
 
 [tool.uv]
