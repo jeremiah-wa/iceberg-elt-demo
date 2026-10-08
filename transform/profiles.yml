@@ -2,12 +2,12 @@ transform:
   target: dev
   outputs:
     dev:
-      # Trino (infra/docker-compose.yml, reached by service name from the dagster container)
+      # Trino (infra/docker-compose.yml, on localhost in the dagster container's shared network)
       # runs the models. Its catalog `lake` is the Lakekeeper warehouse "demo", configured in
       # infra/trino/catalog/lake.properties
       type: trino
       method: none
-      host: trino
+      host: localhost
       port: 8080
       user: dbt
       database: lake

@@ -36,6 +36,7 @@ services:
     image: registry.k8s.io/pause:3.10.1
     ports:
       - "3000:3000"   # Dagster
+      - "8080:8080"   # Trino
       - "8181:8181"   # Lakekeeper
       - "9000:9000"   # MinIO API
       - "9001:9001"   # MinIO console
@@ -145,8 +146,7 @@ services:
   # Trino used about 1.9 GB running the models, too close to a 2 GB limit.
   trino:
     image: trinodb/trino:${TRINO_VERSION:-483}
-    ports:
-      - "8080:8080"
+    network_mode: service:net
     volumes:
       - ./trino/catalog/lake.properties:/etc/trino/catalog/lake.properties:ro
     mem_limit: 3g
