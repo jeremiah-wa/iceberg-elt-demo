@@ -126,13 +126,14 @@ services:
   # dbt-trino sends every model's SQL here. Trino reads and writes the Iceberg tables through
   # its `lake` catalog, the Lakekeeper warehouse "demo" (trino/catalog/lake.properties).
   # The image sizes the JVM heap at 80% of the container's memory, so mem_limit caps both.
+  # Trino used about 1.9 GB running the models, too close to a 2 GB limit.
   trino:
     image: trinodb/trino:${TRINO_VERSION:-483}
     ports:
       - "8080:8080"
     volumes:
       - ./trino/catalog/lake.properties:/etc/trino/catalog/lake.properties:ro
-    mem_limit: 2g
+    mem_limit: 3g
     healthcheck:
       test: ["CMD", "/usr/lib/trino/bin/health-check"]
       interval: 2s
