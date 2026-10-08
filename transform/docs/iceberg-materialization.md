@@ -1,8 +1,8 @@
 # Writing Iceberg tables from dbt-core
 
-Every model in this project uses a custom materialization, `iceberg_table` ([macros/iceberg_table.sql](../macros/iceberg_table.sql)), instead of dbt's built-in `table`. This page explains why. It covers what dbt-duckdb's `table` materialization does, which of its steps the DuckDB Iceberg extension rejects, what the workaround does instead and what it costs, and what would let us delete it.
+Every model in this project uses a custom materialization, `iceberg_table` ([macros/iceberg_table.sql](../macros/iceberg_table.sql)), instead of dbt's built-in `table`. This page explains why. It covers what dbt-duckdb's `table` materialization does, which of its steps the DuckDB Iceberg extension rejects, what the workaround does instead and what it costs, and the ways to replace it.
 
-The behavior described here was tested on 2026-10-07 with DuckDB 1.5.6, dbt-core 1.12.5, dbt-duckdb 1.11.0 and Lakekeeper v0.13.6, inside the Dagster container. [How this was tested](#how-this-was-tested) has the details.
+The behavior described here was tested on 2026-10-07 with DuckDB 1.5.6, dbt-core 1.12.5, dbt-duckdb 1.11.0 and Lakekeeper v0.13.6, inside the Dagster container. [How this was tested](#how-this-was-tested) has the details. The notes on dbt v2, upstream fixes and other adapters come from research on 2026-10-08 in source code, docs and issue trackers, and weren't tested. [iceberg-adapter-options.md](iceberg-adapter-options.md) has the full sources.
 
 ## How the project reaches Iceberg
 
@@ -21,9 +21,11 @@ dbt documents DuckDB Iceberg support in [DuckDB and Apache Iceberg](https://docs
 - set `catalog_name` on each model. DuckDB has no built-in managed Iceberg catalog, so there is no `table_format='iceberg'` shortcut like Snowflake or Databricks have;
 - use the built-in `table` or `incremental` materializations, the only two the page lists for Iceberg.
 
-The page also lists two write-compat catalog options, `stage_create_tables` and `disable_multi_table_commit`, which need DuckDB 1.5.4 or later. Their names suggest they work around the transaction limits described below, but the page doesn't explain what they do.
+The page also lists write-compat catalog options such as `stage_create_tables` and `disable_multi_table_commit`. They're DuckDB `ATTACH` options for catalogs that reject an endpoint DuckDB uses by default, such as staged table creation or multi-table commits ([DuckDB Iceberg options](https://duckdb.org/docs/current/core_extensions/iceberg/iceberg_options.html)). None of them lifts the limits described below. dbt v1 can already pass them through the `attach` options in profiles.yml.
 
-We can't switch. dagster-dbt only supports dbt-core 1.x. Support for dbt v2 is an open request, [dagster#34233](https://github.com/dagster-io/dagster/issues/34233). [pyproject.toml](../pyproject.toml) pins `dbt-core>=1.12,<1.13` for this reason, and the [README](../README.md#why-dbt-core-and-not-dbt-v2) has the details.
+Switching wouldn't fix rebuilds anyway. dbt v2 runs into the same DuckDB limits, and its DuckDB adapter works around them the way this project does. For a catalog with `table_format: iceberg`, it picks a "direct create" write strategy. The source comment says this "skips the temp-table + rename dance entirely, since Iceberg REST attachments do not support `ALTER ... RENAME`" ([catalog_relation.rs](https://github.com/dbt-labs/dbt-core/blob/v2.0.5/crates/dbt-adapter/src/catalog_relation.rs#L21-L44)). The `table` materialization then drops the target before building it ([table.sql](https://github.com/dbt-labs/dbt-core/blob/v2.0.5/crates/dbt-loader/src/dbt_macro_assets/dbt-duckdb/macros/materializations/table.sql#L22-L24)). On Iceberg that's `drop table if exists` without `CASCADE`, run outside a transaction, followed by a create straight into the final name ([adapters.sql](https://github.com/dbt-labs/dbt-core/blob/v2.0.5/crates/dbt-loader/src/dbt_macro_assets/dbt-duckdb/macros/adapters.sql#L227-L238)). That's drop, commit, create, commit, the same sequence as `iceberg_table`, with the same costs. v2 would add grants, `persist_docs` and built-in incremental models. This is read from the v2.0.5 source, not run.
+
+We also can't switch yet. dagster-dbt 0.29.25 requires `dbt-core<1.13`, its dbt Fusion support is in preview, and dbt v2 support is an open request, [dagster#34233](https://github.com/dagster-io/dagster/issues/34233). [pyproject.toml](../pyproject.toml) pins `dbt-core>=1.12,<1.13` for this reason, and the [README](../README.md#why-dbt-core-and-not-dbt-v2) has the details.
 
 ## What the built-in `table` materialization does
 
@@ -60,9 +62,9 @@ Steps 2 and 4 always happen, so there's no run on which the built-in materializa
 | `DROP TABLE t` then `CREATE TABLE t AS ...` in one transaction | `Not implemented Error: Cannot create table deleted within a transaction: lake.verify_scratch.t5` |
 | `DROP TABLE t`, `COMMIT`, then `CREATE TABLE t AS ...`, `COMMIT` | Works |
 
-The `CASCADE` comes from dbt-duckdb's `duckdb__drop_relation` macro, which appends `cascade` to every drop. It has a special case that leaves `cascade` off for DuckLake catalogs, but none for Iceberg. The build fails at step 4 before it reaches step 7. Step 1 only drops something when a leftover tmp or backup table exists.
+The `CASCADE` comes from dbt-duckdb's `duckdb__drop_relation` macro, which appends `cascade` to every drop. It has a special case that leaves `cascade` off for DuckLake catalogs, but none for Iceberg. An open dbt-duckdb pull request, [#747](https://github.com/duckdb/dbt-duckdb/pull/747), adds one. The build fails at step 4 before it reaches step 7. Step 1 only drops something when a leftover tmp or backup table exists.
 
-All of these errors come from DuckDB, not from Lakekeeper. Three of them are "Not implemented" errors, so newer versions of the Iceberg extension may lift them. Recheck when DuckDB is upgraded.
+All of these errors come from DuckDB, not from Lakekeeper, and no DuckDB release lifts them yet. As of 2026-10-07, all four are still in the Iceberg extension's source, both on the branch DuckDB 1.5.6 is built from and on `main`. On `main` the rename rule is stricter. A transaction can hold table changes or a single rename or drop, but not both. The feature requests that would help are open: `CREATE OR REPLACE` ([duckdb-iceberg#784](https://github.com/duckdb/duckdb-iceberg/issues/784)), a single-snapshot `INSERT OVERWRITE` ([#620](https://github.com/duckdb/duckdb-iceberg/issues/620)) and `CASCADE` ([#1000](https://github.com/duckdb/duckdb-iceberg/issues/1000)). Recheck when DuckDB 2.0 ships, which the [release calendar](https://duckdb.org/release_calendar) plans for 2026-10-21.
 
 ## What `iceberg_table` does instead
 
@@ -109,14 +111,16 @@ Python models fail outright. The macro doesn't declare `supported_languages`, so
 
 **There's no incremental mode.** Every run rebuilds every table in full. That's fine for the current data size.
 
-## When we can delete it
+## Ways to replace it
 
-Either of two changes could make the macro unnecessary.
+dbt v2 isn't one of them, for the reason in [Why not dbt's own Iceberg support](#why-not-dbts-own-iceberg-support). [iceberg-adapter-options.md](iceberg-adapter-options.md) compares the options below in detail. None of them has been tested against Lakekeeper yet.
 
-1. **dagster-dbt supports dbt v2.** Then move the `ATTACH` from `profiles.yml` into a `catalogs.yml` entry of type `iceberg_rest`, set `catalog_name` on the models, enable `use_catalogs_v2`, and go back to `materialized: table` (or `incremental` where it helps). Test a build against Lakekeeper first, and try the `stage_create_tables` and `disable_multi_table_commit` options if the built-in materialization hits the same errors.
-2. **The DuckDB Iceberg extension allows renaming a table created in the same transaction.** Then `materialized: table` on dbt-core 1.x gets past step 4. Rebuilds would still hit `CASCADE` at step 7 unless the extension accepts it or dbt-duckdb leaves it off for Iceberg, as it does for DuckLake. To check, switch one model to `materialized: table` and run `dbt build --select <model>` twice. The first run tests the tmp-table rename, and the second tests the backup rename and drop.
+1. **Port dbt-duckdb PR #747.** [#747](https://github.com/duckdb/dbt-duckdb/pull/747) changes two macros. `duckdb__drop_relation` leaves off `CASCADE` for Iceberg, and `duckdb__rename_relation` commits before renaming an Iceberg table. The PR isn't merged, but dbt dispatches both macros and looks in the root project first, so copies in this project's `macros/` folder would override dbt-duckdb's. Models could then go back to `materialized: table`. Every statement in the resulting sequence works in the table above. The old table stays readable while the model's SQL runs, and a failed build leaves it in place. The table is missing only between the last rename and the final commit. History still restarts on every run.
+2. **Rewrite `iceberg_table` to replace rows in place.** On later runs, the macro would build the model into a local DuckDB temporary table, then run `DELETE FROM <model>` and `INSERT INTO <model> SELECT * FROM <temp>` in one transaction. Only one table changes and nothing is renamed, so none of the limits above apply, and the table keeps its snapshot history. When a model's columns change, it would fall back to today's drop and create. Whether readers can ever see an empty table depends on DuckDB sending the delete and the insert as one Iceberg commit, which nobody has tested. Every run also leaves position delete files and new snapshots behind. Nothing in this stack compacts tables, and open-source Lakekeeper doesn't expire snapshots, since that's a Lakekeeper Plus feature.
+3. **Switch to an adapter whose engine replaces tables atomically.** dbt-trino with `on_table_exists='replace'` runs `CREATE OR REPLACE TABLE`, which Trino documents as atomic on Iceberg and which keeps history. dbt-spark with `file_format='iceberg'` runs Iceberg's replace-table-as-select, which is also atomic and keeps history. Both support dbt-core 1.12, so dagster-dbt stays as it is. Each adds a JVM service to the stack, and the models would have to move to that engine's SQL dialect.
+4. **Wait for DuckDB to allow renaming a table created in the same transaction.** Then `materialized: table` on dbt-core 1.x gets past step 4. Rebuilds would still hit `CASCADE` at step 7 unless the extension accepts it or dbt-duckdb leaves it off for Iceberg, as #747 does. To check, switch one model to `materialized: table` and run `dbt build --select <model>` twice. The first run tests the tmp-table rename, and the second tests the backup rename and drop.
 
-After either change, delete [macros/iceberg_table.sql](../macros/iceberg_table.sql) and its entry in [macros/_macros.yml](../macros/_macros.yml), and update the "How it writes Iceberg" section of the [README](../README.md).
+Options 1, 3 and 4 make the macro unnecessary. After any of them, delete [macros/iceberg_table.sql](../macros/iceberg_table.sql) and its entry in [macros/_macros.yml](../macros/_macros.yml), and update the "How it writes Iceberg" section of the [README](../README.md). Option 2 keeps the macro and changes what it does.
 
 ## How this was tested
 
