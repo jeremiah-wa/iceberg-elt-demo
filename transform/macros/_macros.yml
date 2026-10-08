@@ -12,6 +12,44 @@ macros:
       - name: node
         description: The model being built (unused)
 
+  - name: is_iceberg_relation
+    description: >
+      True when the relation's database is an Iceberg attachment in the current target,
+      i.e. an `attach` entry whose `type`, or `options.type`, is `iceberg` and whose alias
+      matches the relation's database. In the `dev` target that's `lake`. In the `docs`
+      target `lake` is an in-memory DuckDB database, so it's false there. Stands in for the
+      `adapter.is_iceberg()` method that duckdb/dbt-duckdb#747 adds in Python.
+    arguments:
+      - name: relation
+        type: relation
+        description: The relation to check
+
+  - name: duckdb__drop_relation
+    description: >
+      Overrides dbt-duckdb's macro to leave `CASCADE` off drops in Iceberg attachments,
+      which DuckDB rejects with "DROP TABLE <table_name> CASCADE is not supported for
+      Iceberg tables". dbt-duckdb already does this for DuckLake. Ported from
+      duckdb/dbt-duckdb#747.
+    arguments:
+      - name: relation
+        type: relation
+        description: The table or view to drop
+
+  - name: duckdb__rename_relation
+    description: >
+      Overrides dbt-duckdb's macro to commit the open transaction before renaming a table
+      in an Iceberg attachment. DuckDB can't rename an Iceberg table in the transaction
+      that created it ("This table ... was modified already, can't be renamed!"), and the
+      `table` materialization renames `<model>__dbt_tmp` right after creating it. Ported
+      from duckdb/dbt-duckdb#747.
+    arguments:
+      - name: from_relation
+        type: relation
+        description: The relation to rename
+      - name: to_relation
+        type: relation
+        description: The relation with the new name. Only its identifier is used
+
   - name: materialization_iceberg_table_duckdb
     description: >
       The `iceberg_table` materialization every model uses (set in dbt_project.yml).
