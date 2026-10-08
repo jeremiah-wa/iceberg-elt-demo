@@ -36,6 +36,8 @@ DuckDB needs no S3 keys here. Lakekeeper hands out short-lived credentials for e
 
 ## How it writes Iceberg
 
+[docs/architecture.md](docs/architecture.md) explains how dbt, DuckDB, Lakekeeper and MinIO work together, with diagrams of a model build, where the files are stored and who holds which keys. In short:
+
 - [profiles.yml](profiles.yml) loads DuckDB's `iceberg` extension and attaches the Lakekeeper warehouse `demo` as a database called `lake`. `data/transform.duckdb` is DuckDB's local session file. It holds no tables.
 - [dbt_project.yml](dbt_project.yml) puts every model in the `lake` database, in the `staging` or `marts` schema. The [generate_schema_name](macros/generate_schema_name.sql) macro keeps those names as they are, instead of dbt's default `<target_schema>_staging`.
 - Models use a custom `iceberg_table` materialization ([macros/iceberg_table.sql](macros/iceberg_table.sql)). dbt-duckdb's built-in `table` materialization builds a temporary table and renames it into place. DuckDB can't rename Iceberg tables created in the same transaction, and it doesn't support `CREATE OR REPLACE` on them. So `iceberg_table` drops the table, commits, and creates it again.
