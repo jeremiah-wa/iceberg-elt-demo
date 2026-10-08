@@ -4,6 +4,10 @@ An ELT pipeline that keeps every table in Apache Iceberg. dlt loads issues and p
 
 Everything runs in Docker. You don't need a GitHub token, cloud account or local Python.
 
+## Why this demo exists
+
+The project set out to answer one question: can Iceberg get you out of vendor lock-in? Partly. When the dbt models moved from DuckDB to Trino, the tables and their snapshot history came along without an export or a migration. The SQL, the way each engine writes tables, and table maintenance didn't come along. Each had to be redone for Trino. The [Iceberg Roulette](https://b-per.github.io/iceberg-roulette/#matrix) compatibility matrix shows the same pattern for cloud engines: most can read Iceberg from many catalogs, but the catalog decides which engines can write. [docs/vendor-lock-in.md](docs/vendor-lock-in.md) has the full answer.
+
 <p align="center">
   <img src="static/dagster.svg" width="700" alt="Dagster asset graph: the dlt assets issues and pull_requests in the ingest group feed the dbt models stg_github__issues, stg_github__pull_requests and fct_pull_requests in the transform group, all materialized with their asset checks passed">
 </p>
@@ -76,5 +80,6 @@ Every statement dbt sends shows up here with its SQL and timings: model builds a
 | `transform/` | dbt project that builds `staging` and `marts` | [transform/README.md](transform/README.md) |
 | `orchestrate/` | Dagster definitions: assets, the `elt` job, a daily schedule | [orchestrate/README.md](orchestrate/README.md) |
 | `infra/` | Docker Compose stack: MinIO, Lakekeeper, Trino, Dagster | [infra/README.md](infra/README.md) |
+| `docs/` | What the project found about Iceberg and vendor lock-in | [docs/vendor-lock-in.md](docs/vendor-lock-in.md) |
 
 `extract_load`, `transform` and `orchestrate` form one [uv](https://docs.astral.sh/uv/) workspace with a single lockfile. Running `uv sync` in the repo root gives your editor an environment for autocomplete and type checking. The pipelines themselves run in the Dagster container.
