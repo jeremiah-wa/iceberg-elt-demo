@@ -1,12 +1,14 @@
-# Local Iceberg lakehouse: MinIO (S3-compatible storage), Lakekeeper (Iceberg REST catalog)
-# and Dagster, which runs the dlt -> dbt pipeline.
+# Local Iceberg lakehouse: MinIO (S3-compatible storage), Lakekeeper (Iceberg REST catalog),
+# Trino, which runs dbt's SQL, and Dagster, which runs the dlt -> dbt pipeline.
 #
 #   Dagster    -> http://localhost:3000   UI: "Materialize all" runs the pipeline
 #   MinIO      -> http://localhost:9001   console (API on :9000)
 #   Lakekeeper -> http://localhost:8181   UI + Iceberg REST catalog (warehouse "demo")
+#   Trino      -> http://localhost:8080   UI: queries dbt sent
 #
-# Containers reach each other by service name (minio:9000, lakekeeper:8181). dlt and dbt run
-# inside the dagster container, so only containers read or write table data.
+# Containers reach each other by service name (minio:9000, lakekeeper:8181, trino:8080). dlt
+# and dbt run inside the dagster container, and dbt's SQL runs in Trino, so only containers
+# read or write table data.
 #
 # Every setting has a default, so `docker compose up -d` works as is; .env overrides them.
 
@@ -120,6 +122,27 @@ services:
       - ./lakekeeper/create-warehouse.json:/init/create-warehouse.json:ro
     restart: "no"
 
+  # --- Query engine: Trino ----------------------------------------------------
+  # dbt-trino sends every model's SQL here. Trino reads and writes the Iceberg tables through
+  # its `lake` catalog, the Lakekeeper warehouse "demo" (trino/catalog/lake.properties).
+  # The image sizes the JVM heap at 80% of the container's memory, so mem_limit caps both.
+  trino:
+    image: trinodb/trino:${TRINO_VERSION:-483}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./trino/catalog/lake.properties:/etc/trino/catalog/lake.properties:ro
+    mem_limit: 2g
+    healthcheck:
+      test: ["CMD", "/usr/lib/trino/bin/health-check"]
+      interval: 2s
+      timeout: 10s
+      retries: 30
+      start_period: 10s
+    depends_on:
+      lakekeeper-init:
+        condition: service_completed_successfully
+
   # --- Orchestration ----------------------------------------------------------
   # dagster dev with the workspace's locked environment. Project sources are bind-mounted,
   # so code edits show up after "Reload definitions" in the UI.
@@ -144,6 +167,8 @@ services:
     depends_on:
       lakekeeper-init:
         condition: service_completed_successfully
+      trino:
+        condition: service_healthy
 
 volumes:
   dagster-home:
