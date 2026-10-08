@@ -21,7 +21,7 @@ Dagster runs the dlt and dbt steps as one job.
 
 ## Quickstart
 
-You need Docker with Compose v2, and ports 3000, 8181, 9000 and 9001 free.
+You need Docker with Compose v2, about 4 GB of memory and 4 GB of disk for Docker, and ports 3000, 8181, 9000 and 9001 free. [infra/README.md](infra/README.md#prerequisites) lists the prerequisites and the measured requirements.
 
 ```bash
 git clone <repo-url> iceberg-elt-demo

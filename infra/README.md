@@ -2,6 +2,26 @@
 
 The Docker Compose stack for the demo: object storage, the Iceberg catalog and Dagster. Start it from this folder with `docker compose up -d`.
 
+## Prerequisites
+
+- Docker Engine with the Compose plugin, or Docker Desktop. The commands use `docker compose`, not the older `docker-compose`.
+- Free ports on your machine: 3000 (Dagster), 8181 (Lakekeeper), 9000 and 9001 (MinIO).
+- Internet access to pull the images, to build the Dagster image from PyPI packages, and for the pipeline's calls to the GitHub API. The calls are anonymous. GitHub allows 60 an hour per IP address, and a run makes five, one per repo.
+
+You don't need a GitHub token, a cloud account or Python on your machine.
+
+## System requirements
+
+Measured on 2026-10-08 with Docker Desktop on Windows 11, with 16 CPUs and 8 GB of memory available to Docker:
+
+| Resource | Recommended | Measured |
+|---|---|---|
+| Memory available to Docker | 4 GB | 1.0 GB with the stack idle, 1.7 GB at the peak of a full pipeline run. Most of it is the Dagster container, which went from 0.6 GB to 1.2 GB during the run because dlt and DuckDB run inside it. |
+| Disk | 4 GB | 3.7 GB of images, mostly the 2.6 GB Dagster image. The data volumes stayed under 100 MB. |
+| CPU | | The stack sets no CPU limits. A full pipeline run took 33 s. |
+
+On Docker Desktop, the memory available to Docker is set under **Settings > Resources**. With the WSL 2 backend on Windows, it's the `memory` setting in `.wslconfig` instead.
+
 ## Services
 
 | Service | Image | Port | Role |
